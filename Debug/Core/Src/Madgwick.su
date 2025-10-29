@@ -1,0 +1,4 @@
+../Core/Src/Madgwick.c:15:6:Madgwick_Init	16	static
+../Core/Src/Madgwick.c:23:6:Madgwick_Update6DOF	120	static
+../Core/Src/Madgwick.c:81:6:Madgwick_GetQuaternion	24	static
+../Core/Src/Madgwick.c:89:6:Madgwick_GetEuler	48	static

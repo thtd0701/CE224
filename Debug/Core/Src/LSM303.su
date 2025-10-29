@@ -1,0 +1,3 @@
+../Core/Src/LSM303.c:12:6:LSM303_Write_Accel	32	static
+../Core/Src/LSM303.c:18:6:LSM303_ReadAccel	40	static
+../Core/Src/LSM303.c:33:6:LSM303_Init	8	static
