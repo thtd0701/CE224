@@ -86,16 +86,7 @@ void Madgwick_GetQuaternion(float *out_q0, float *out_q1, float *out_q2, float *
     *out_q3 = q3;
 }
 
-void Madgwick_GetEuler(float q0, float q1, float q2, float q3, float *roll, float *pitch, float *yaw)
+void Madgwick_GetEuler(float q0, float q1, float q2, float q3, float *roll)
 {
-    // Roll (x-axis rotation)
     *roll = atan2f(2.0f * (q0 * q1 + q2 * q3), 1.0f - 2.0f * (q1 * q1 + q2 * q2));
-    // Pitch (y-axis rotation)
-    float sinp = 2.0f * (q0 * q2 - q3 * q1);
-    if (fabsf(sinp) >= 1)
-        *pitch = copysignf(3.14159f / 2, sinp); // use 90 degrees if out of range
-    else
-        *pitch = asinf(sinp);
-    // Yaw (z-axis rotation)
-    *yaw = atan2f(2.0f * (q0 * q3 + q1 * q2), 1.0f - 2.0f * (q2 * q2 + q3 * q3));
 }

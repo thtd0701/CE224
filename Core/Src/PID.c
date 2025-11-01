@@ -3,12 +3,19 @@
 void PIDController_Init(PIDController *pid) {
 
 	/* Clear controller variables */
+	pid->Kp = 50.0f;
+	pid->Ki = 1.1f;
+	pid->Kd = 4.0f;
+	pid->T = 0.005f;
+	pid->tau = 0.02f;
+	pid->limMax = 4096.0f;
+	pid->limMin = -4096.0f;
+	pid->limMaxInt = 2000.0f;
+	pid->limMinInt = -2000.0f;
 	pid->integrator = 0.0f;
 	pid->prevError  = 0.0f;
-
 	pid->differentiator  = 0.0f;
 	pid->prevMeasurement = 0.0f;
-
 	pid->out = 0.0f;
 
 }

@@ -18,6 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+#include "queue.h"
+#include "semphr.h"
+#include "event_groups.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -54,11 +60,6 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
-LSM303_AccelData accelData;
-I3G4250D_GyroData gyroData;
-PIDController angle_pid;
-float roll, pitch, yaw;
-float control;
 uint8_t whoami = 0;
 /* USER CODE END PV */
 
@@ -68,13 +69,21 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
+
 /* USER CODE BEGIN PFP */
 void MotorControl(float controlSignal);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+//TASK HANDLER
+xTaskHandle IMU_Task_Handle;
+xTaskHandle Control_Task_Handle;
+//QUEUE HANDLER
+xQueueHandle Angle_Queue;
+//TASK FUNCTION
+void IMU_Task(void *argument);
+void Control_Task(void *argument);
 /* USER CODE END 0 */
 
 /**
@@ -120,37 +129,25 @@ int main(void)
   // HAL_I2C_Mem_Read(&hi2c1, LSM303_ACCEL_ADDRESS, 0x0F, 1, &whoami, 1, HAL_MAX_DELAY);
   LSM303_Init();
   Madgwick_Init(200.0f, 0.6f);
-  PIDController_Init(&angle_pid);
-  angle_pid.Kp = 50.0f;
-  angle_pid.Ki = 1.1f;
-  angle_pid.Kd = 4.0f;
-  angle_pid.T = 0.01f; 
-  angle_pid.tau = 0.02f;
-  angle_pid.limMax = 4096.0f;
-  angle_pid.limMin = -4096.0f;
-  angle_pid.limMaxInt = 2000.0f;
-  angle_pid.limMinInt = -2000.0f;
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  Angle_Queue = xQueueCreate(1, sizeof(float));
+  xTaskCreate(IMU_Task, "IMU Task", 256, NULL, 5, &IMU_Task_Handle);
+  xTaskCreate(Control_Task, "Control Task", 128, NULL, 4, &Control_Task_Handle);
+  vTaskStartScheduler();
   /* USER CODE END 2 */
+
+
+
+  /* Start scheduler */
+
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    LSM303_ReadAccel(&accelData);
-    I3G4250D_ReadGyro(&gyroData);
-    float q0, q1, q2, q3;
-
-    Madgwick_GetQuaternion(&q0, &q1, &q2, &q3);
-    Madgwick_Update6DOF(gyroData.x_rps, gyroData.y_rps, gyroData.z_rps, accelData.x_g, accelData.y_g, accelData.z_g);
-    Madgwick_GetEuler(q0, q1, q2, q3, &roll, &pitch, &yaw);
-    roll *= 180.0f / 3.14159f;
-    pitch *= 180.0f / 3.14159f;
-    yaw *= 180.0f / 3.14159f;
-    control = PIDController_Update(&angle_pid, 1.7f, roll);
-    MotorControl(control);
-    HAL_Delay(5);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -420,7 +417,78 @@ void MotorControl(float controlSignal)
   }
 
 }
+void IMU_Task(void *argument)
+{
+  LSM303_AccelData accelData;
+  I3G4250D_GyroData gyroData;
+  float roll;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xFrequency = pdMS_TO_TICKS(5);
+  while (1)
+  {
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    LSM303_ReadAccel(&accelData);
+    I3G4250D_ReadGyro(&gyroData);
+    float q0, q1, q2, q3;
+    Madgwick_GetQuaternion(&q0, &q1, &q2, &q3);
+    Madgwick_Update6DOF(gyroData.x_rps, gyroData.y_rps, gyroData.z_rps,
+                        accelData.x_g, accelData.y_g, accelData.z_g);
+    Madgwick_GetEuler(q0, q1, q2, q3, &roll);
+    roll *= (180.0f / 3.14159f);
+    xQueueOverwrite(Angle_Queue, &roll);
+  }
+  
+}
+void Control_Task(void *argument)
+{
+  float receivedAngle;
+  float control;
+  PIDController angle_pid;
+  PIDController_Init(&angle_pid);
+  angle_pid.Kp = 50.0f;
+  angle_pid.Ki = 1.1f;
+  angle_pid.Kd = 4.0f;
+  angle_pid.T = 0.01f; 
+  angle_pid.tau = 0.02f;
+  angle_pid.limMax = 4096.0f;
+  angle_pid.limMin = -4096.0f;
+  angle_pid.limMaxInt = 2000.0f;
+  angle_pid.limMinInt = -2000.0f;
+  while (1)
+  {
+    if(xQueueReceive(Angle_Queue, &receivedAngle, portMAX_DELAY) == pdPASS)
+    {
+      control = PIDController_Update(&angle_pid, 1.7f, receivedAngle);
+      MotorControl(control);
+    }
+  }
+  
+}
 /* USER CODE END 4 */
+
+
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM2 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM2)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
