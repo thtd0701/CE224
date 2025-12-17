@@ -1,0 +1,5 @@
+../Core/Src/Filter.c:8:6:ComplementaryFilter_Init	1
+../Core/Src/Filter.c:19:6:ComplementaryFilter_CalibrateGyro	1
+../Core/Src/Filter.c:27:6:ComplementaryFilter_Update	1
+../Core/Src/Filter.c:52:7:ComplementaryFilter_GetRoll	1
+../Core/Src/Filter.c:57:7:ComplementaryFilter_GetPitch	1
