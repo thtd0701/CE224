@@ -5,7 +5,7 @@
 #define MOTOR_PPR         11.0f      // Pulses Per Revolution (motor shaft)
 #define GEAR_RATIO        30.0f      // 1:30 gear reduction
 #define WHEEL_PPR         (MOTOR_PPR * GEAR_RATIO)  // 330 PPR at wheel
-#define SAMPLE_TIME_MS    50.0f      // Sampling interval in milliseconds
+#define SAMPLE_TIME_MS    5.0f      // Sampling interval in milliseconds
 #define SAMPLE_TIME_SEC   (SAMPLE_TIME_MS / 1000.0f)
 
 static TIM_HandleTypeDef *encoder_left;

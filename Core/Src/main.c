@@ -45,8 +45,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MOTOR_MIN_PWM 1600
-#define MOTOR_MAX_PWM 4096
+#define MOTOR_MIN_RIGHT 530
+#define MOTOR_MIN_LEFT 450
+#define MOTOR_MAX_PWM 999
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,7 +67,7 @@ TIM_HandleTypeDef htim4;
 UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 uint8_t whoami = 0;
-EncoderData speed;
+// EncoderData speed;
 KalmanFilter kf;
 float roll;
 float speed_left;
@@ -168,15 +169,6 @@ int main(void)
   // TickType_t lasttime = HAL_GetTick();
   // HAL_Delay(15000);
   /* USER CODE END 2 */
-
-
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* Start scheduler */
-
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -341,9 +333,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 2;
+  htim1.Init.Prescaler = 9;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 4096;
+  htim1.Init.Period = 999;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -580,7 +572,7 @@ static void MX_GPIO_Init(void)
 void MotorControlLeft(float Signal)
 {
   uint32_t pwmleft = (uint32_t)(fabs(Signal));
-  pwmleft = MOTOR_MIN_PWM + (pwmleft * (MOTOR_MAX_PWM - MOTOR_MIN_PWM) / MOTOR_MAX_PWM);
+  pwmleft = MOTOR_MIN_LEFT + (pwmleft * (MOTOR_MAX_PWM - MOTOR_MIN_LEFT) / MOTOR_MAX_PWM);
   if (Signal > 0)
   {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
@@ -595,7 +587,7 @@ void MotorControlLeft(float Signal)
 void MotorControlRight(float Signal)
 {
   uint32_t pwmright = (uint32_t)(fabs(Signal));
-  pwmright = MOTOR_MIN_PWM + (pwmright * (MOTOR_MAX_PWM - MOTOR_MIN_PWM) / MOTOR_MAX_PWM);
+  pwmright = MOTOR_MIN_RIGHT + (pwmright * (MOTOR_MAX_PWM - MOTOR_MIN_RIGHT) / MOTOR_MAX_PWM);
   if (Signal > 0)
   {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
@@ -632,43 +624,41 @@ void Control_Task(void *argument)
 {
   float receivedAngle;
 
-  PIDController angle_pid;
-  PIDController_Init(&angle_pid);
-  angle_pid.Kp = 3.5f;
-  angle_pid.Ki = 0.0f;
-  angle_pid.Kd = 0.02f;
-  angle_pid.limMax = 120.0f;
-  angle_pid.limMin = -120.0f;
-  angle_pid.limMaxInt = 120.0f;
-  angle_pid.limMinInt = -120.0f;
+  // PIDController angle_pid;
+  // PIDController_Init(&angle_pid);
+  // angle_pid.Kp = 6.5f;
+  // angle_pid.Ki = 0.0f;
+  // angle_pid.Kd = 3.0f;
+  // angle_pid.limMax = 120.0f;
+  // angle_pid.limMin = -120.0f;
+  // angle_pid.limMaxInt = 120.0f;
+  // angle_pid.limMinInt = -120.0f;
   PIDController left_pid;
   PIDController right_pid;
   PIDController_Init(&left_pid);
-  left_pid.Kp = 500.0f;
-  left_pid.Ki = 450.0f;
-  left_pid.Kd = 0.0f;
-  left_pid.limMax = 4096.0f;
-  left_pid.limMin = -4096.0f;
-  left_pid.limMaxInt = 4096.0f;
-  left_pid.limMinInt = -4096.0f;
+  left_pid.Kp = 60.0f;
+  left_pid.Ki = 100.0f;
+  left_pid.Kd = 0.036f;
+  left_pid.limMax = 999.0f;
+  left_pid.limMin = -999.0f;
+  left_pid.limMaxInt = 299.0f;
+  left_pid.limMinInt = -299.0f;
   PIDController_Init(&right_pid);
-  right_pid.Kp = 520.0f;
-  right_pid.Ki = 450.0f;
-  right_pid.Kd = 0.0f;
-  right_pid.limMax = 4096.0f;
-  right_pid.limMin = -4096.0f;
-  right_pid.limMaxInt = 4096.0f;
-  right_pid.limMinInt = -4096.0f;
+  right_pid.Kp = 65.0f;
+  right_pid.Ki = 100.0f;
+  right_pid.Kd = 0.036f;
+  right_pid.limMax = 999.0f;
+  right_pid.limMin = -999.0f;
+  right_pid.limMaxInt = 299.0f;
+  right_pid.limMinInt = -299.0f;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(5);
   while (1)
   {
     if(xQueueReceive(Angle_Queue, &receivedAngle, portMAX_DELAY) == pdPASS)
     {
-      velocity = PIDController_Update(&angle_pid, 0.0f, receivedAngle);
-      Encoder_GetSpeed(&speed);
-      speed_left = PIDController_Update(&left_pid, velocity, speed.left_speed);
-      speed_right = PIDController_Update(&right_pid, velocity, speed.right_speed);
+      speed_left = PIDController_Update(&left_pid, 0.8f, receivedAngle);
+      speed_right = PIDController_Update(&right_pid, 0.8f, receivedAngle);
       MotorControlLeft(speed_left);
       MotorControlRight(speed_right);
       vTaskDelayUntil(&xLastWakeTime, xFrequency);
